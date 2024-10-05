@@ -1,0 +1,9 @@
+{
+    "org.tweetwallfx.conference.impl.DevoxxPhotoSharingDataProvider$Config": {
+        "queryUrl": "https://us-central1-photosharing-74cf4.cloudfunctions.net/getPhotosJson"
+    },
+
+    "conferenceClient": {
+        "eventStatsToken": "eventStats:devoxx-voxxed:c5ac7b45-f7cb-4192-a0ee-f6f7596cad30"
+    }
+}
