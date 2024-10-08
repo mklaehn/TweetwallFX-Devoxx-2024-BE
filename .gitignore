@@ -30,4 +30,5 @@ gradle-app.setting
 
 # log files
 *.log
+*.log.gz
 
