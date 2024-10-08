@@ -73,19 +73,27 @@ public class DevoxxPhotoSharingMosaicStep implements Step {
     }
 
     @Override
+    public boolean shouldSkip(final MachineContext context) {
+        boolean forceSkipping = null == config.skipWhenSkipped
+                ? false
+                : config.skipWhenSkipped.equals(context.get(Step.SKIP_TOKEN));
+        boolean notEnoughImagesAvailable = context.getDataProvider(DevoxxPhotoSharingDataProvider.class)
+                .getPhotos(config.minimumNumberOfImagesInCache).size() < config.minimumNumberOfImagesInCache;
+
+        boolean skip = forceSkipping || notEnoughImagesAvailable;
+        return skip;
+    }
+
+    @Override
     public void doStep(final MachineContext context) {
         WordleSkin wordleSkin = (WordleSkin) context.get("WordleSkin");
         DevoxxPhotoSharingDataProvider dataProvider = context.getDataProvider(DevoxxPhotoSharingDataProvider.class);
         pane = wordleSkin.getPane();
-        if (dataProvider.getPhotos(35).size() < 35) {
-            context.proceed();
-        } else {
-            Transition createMosaicTransition = createMosaicTransition(dataProvider.getPhotos(50));
-            createMosaicTransition.setOnFinished(event
-                    -> executeAnimations(context));
+        Transition createMosaicTransition = createMosaicTransition(dataProvider.getPhotos(config.numberOfImagesToChooseFrom));
+        createMosaicTransition.setOnFinished(event
+                -> executeAnimations(context));
 
-            createMosaicTransition.play();
-        }
+        createMosaicTransition.play();
     }
 
     @Override
@@ -104,7 +112,7 @@ public class DevoxxPhotoSharingMosaicStep implements Step {
             revert.play();
             revert.setOnFinished(event -> {
                 count++;
-                if (count < 3) {
+                if (count < config.numberOfHighlights) {
                     executeAnimations(context);
                 } else {
                     count = 0;
@@ -170,7 +178,7 @@ public class DevoxxPhotoSharingMosaicStep implements Step {
         // select next random not but not previously shown image
         int index;
         do {
-            index = RANDOM.nextInt(config.columns*config.rows);
+            index = RANDOM.nextInt(config.columns * config.rows);
         } while (!highlightedIndexes.add(index));
 
         int column = index % config.columns;
@@ -208,8 +216,8 @@ public class DevoxxPhotoSharingMosaicStep implements Step {
             }
         }
 
-        double maxWidth = (0 != config.width ? config.width : pane.getWidth()) * 0.8;
-        double maxHeight = (0 != config.height ? config.height : pane.getHeight()) * 0.8;
+        double maxWidth = (0 != config.width ? config.width : pane.getWidth()) * config.percentageForHighlightImage;
+        double maxHeight = (0 != config.height ? config.height : pane.getHeight()) * config.percentageForHighlightImage;
 
         double realWidth = randomView.getImage().getWidth();
         double realHeight = randomView.getImage().getHeight();
@@ -219,10 +227,11 @@ public class DevoxxPhotoSharingMosaicStep implements Step {
         double targetWidth = realWidth * scaleFactor;
         double targetheight = realHeight * scaleFactor;
 
-        final SizeTransition zoomBox = new SizeTransition(Duration.seconds(2.5), randomView.fitWidthProperty(), randomView.fitHeightProperty())
+        final SizeTransition zoomBox = new SizeTransition(Duration.seconds(config.resizeAndHighlightTransitionTime),
+                randomView.fitWidthProperty(), randomView.fitHeightProperty())
                 .withWidth(randomView.getLayoutBounds().getWidth(), targetWidth)
                 .withHeight(randomView.getLayoutBounds().getHeight(), targetheight);
-        final LocationTransition trans = new LocationTransition(Duration.seconds(2.5), randomView)
+        final LocationTransition trans = new LocationTransition(Duration.seconds(config.resizeAndHighlightTransitionTime), randomView)
                 .withX(randomView.getLayoutX(), (0 != config.width ? config.width : pane.getWidth()) / 2 - targetWidth / 2 + config.layoutX)
                 .withY(randomView.getLayoutY(), (0 != config.height ? config.height : pane.getHeight()) / 2 - targetheight / 2 + config.layoutY);
         secondParallelTransition.getChildren().addAll(trans, zoomBox);
@@ -262,10 +271,11 @@ public class DevoxxPhotoSharingMosaicStep implements Step {
         final double width = (0 != config.width ? config.width : pane.getWidth()) / (double) config.columns - 10;
         final double height = (0 != config.height ? config.height : pane.getHeight()) / (double) config.rows - 8;
 
-        final SizeTransition zoomBox = new SizeTransition(Duration.seconds(2.5), randomView.fitWidthProperty(), randomView.fitHeightProperty())
+        final SizeTransition zoomBox = new SizeTransition(Duration.seconds(config.resizeAndHighlightTransitionTime),
+                randomView.fitWidthProperty(), randomView.fitHeightProperty())
                 .withWidth(randomView.getLayoutBounds().getWidth(), width)
                 .withHeight(randomView.getLayoutBounds().getHeight(), height);
-        final LocationTransition trans = new LocationTransition(Duration.seconds(2.5), randomView)
+        final LocationTransition trans = new LocationTransition(Duration.seconds(config.resizeAndHighlightTransitionTime), randomView)
                 .withX(randomView.getLayoutX(), bounds[column][row].getMinX())
                 .withY(randomView.getLayoutY(), bounds[column][row].getMinY());
         secondParallelTransition.getChildren().addAll(trans, zoomBox);
@@ -322,5 +332,11 @@ public class DevoxxPhotoSharingMosaicStep implements Step {
         public double height = 0;
         public int columns = 6;
         public int rows = 5;
+        public String skipWhenSkipped;
+        int minimumNumberOfImagesInCache = 35;
+        int numberOfImagesToChooseFrom = 50;
+        double percentageForHighlightImage = 0.8;
+        double resizeAndHighlightTransitionTime = 2.5;
+        int numberOfHighlights = 3;
     }
 }
