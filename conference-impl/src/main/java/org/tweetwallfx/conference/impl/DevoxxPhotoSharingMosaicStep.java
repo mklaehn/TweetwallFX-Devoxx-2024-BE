@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import javafx.animation.FadeTransition;
 import javafx.animation.ParallelTransition;
@@ -47,11 +48,13 @@ import javafx.scene.layout.Pane;
 import javafx.util.Duration;
 
 import org.tweetwallfx.controls.WordleSkin;
+import org.tweetwallfx.controls.steps.ImageMosaicStep;
 import org.tweetwallfx.stepengine.api.DataProvider;
 import org.tweetwallfx.stepengine.api.Step;
 import org.tweetwallfx.stepengine.api.StepEngine.MachineContext;
 import org.tweetwallfx.stepengine.api.config.AbstractConfig;
 import org.tweetwallfx.stepengine.api.config.StepEngineSettings;
+import org.tweetwallfx.stepengine.dataproviders.ImageStorage;
 import org.tweetwallfx.transitions.LocationTransition;
 import org.tweetwallfx.transitions.SizeTransition;
 
@@ -78,7 +81,7 @@ public class DevoxxPhotoSharingMosaicStep implements Step {
                 ? false
                 : config.skipWhenSkipped.equals(context.get(Step.SKIP_TOKEN));
         boolean notEnoughImagesAvailable = context.getDataProvider(DevoxxPhotoSharingDataProvider.class)
-                .getPhotos(config.minimumNumberOfImagesInCache).size() < config.minimumNumberOfImagesInCache;
+                .getAccess().count() < config.minimumNumberOfImagesInCache;
 
         boolean skip = forceSkipping || notEnoughImagesAvailable;
         return skip;
@@ -89,7 +92,7 @@ public class DevoxxPhotoSharingMosaicStep implements Step {
         WordleSkin wordleSkin = (WordleSkin) context.get("WordleSkin");
         DevoxxPhotoSharingDataProvider dataProvider = context.getDataProvider(DevoxxPhotoSharingDataProvider.class);
         pane = wordleSkin.getPane();
-        Transition createMosaicTransition = createMosaicTransition(dataProvider.getPhotos(config.numberOfImagesToChooseFrom));
+        Transition createMosaicTransition = createMosaicTransition(dataProvider.getAccess().getImages(config.numberOfImagesToChooseFrom));
         createMosaicTransition.setOnFinished(event
                 -> executeAnimations(context));
 
@@ -98,7 +101,7 @@ public class DevoxxPhotoSharingMosaicStep implements Step {
 
     @Override
     public java.time.Duration preferredStepDuration(final MachineContext context) {
-        return java.time.Duration.ofSeconds(1);
+        return config.stepDuration();
     }
 
     private void executeAnimations(final MachineContext context) {
@@ -139,14 +142,16 @@ public class DevoxxPhotoSharingMosaicStep implements Step {
         });
     }
 
-    private Transition createMosaicTransition(final List<Image> image) {
+    private Transition createMosaicTransition(final List<ImageStorage> imageStorages) {
         final SequentialTransition fadeIn = new SequentialTransition();
         final List<FadeTransition> allFadeIns = new ArrayList<>();
         final double width = (0 != config.width ? config.width : pane.getWidth()) / (double) config.columns - 10;
         final double height = (0 != config.height ? config.height : pane.getHeight()) / (double) config.rows - 8;
         int posOfQrCodeX = RANDOM.nextInt(config.columns);
         int posOfQrCodeY = RANDOM.nextInt(config.rows);
-        final List<Image> distillingList = new ArrayList<>(image);
+        final List<Image> distillingList = imageStorages.stream()
+                .map(ImageStorage::getImage)
+                .collect(Collectors.toList()); // mutable list required
 
         for (int i = 0; i < config.columns; i++) {
             for (int j = 0; j < config.rows; j++) {
