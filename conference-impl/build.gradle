@@ -32,6 +32,7 @@ dependencies {
     implementation 'org.tweetwallfx:tweetwallfx-controls:1.1.+'
     implementation 'org.tweetwallfx:tweetwallfx-conference-spi:1.1.+'
     implementation 'org.tweetwallfx:tweetwallfx-stepengine-api:1.1.+'
+    implementation 'org.tweetwallfx:tweetwallfx-stepengine-dataproviders:1.1.+'
     implementation 'org.tweetwallfx:tweetwallfx-transitions:1.1.+'
     implementation 'org.tweetwallfx:tweetwallfx-utility:1.1.+'
 
