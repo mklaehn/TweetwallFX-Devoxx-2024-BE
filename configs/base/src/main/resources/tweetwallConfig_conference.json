@@ -1,6 +1,7 @@
 {
     "org.tweetwallfx.conference.impl.DevoxxPhotoSharingDataProvider$Config": {
-        "queryUrl": "https://us-central1-photosharing-74cf4.cloudfunctions.net/getPhotosJson"
+        "queryUrl": "https://us-central1-photosharing-74cf4.cloudfunctions.net/getPhotosJson",
+        "scheduleDuration": 60
     },
 
     "conferenceClient": {
