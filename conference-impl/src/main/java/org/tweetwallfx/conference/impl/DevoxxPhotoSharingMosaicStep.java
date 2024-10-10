@@ -32,7 +32,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import javafx.animation.FadeTransition;
 import javafx.animation.ParallelTransition;
@@ -47,6 +46,7 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.Pane;
 import javafx.util.Duration;
 
+import org.slf4j.LoggerFactory;
 import org.tweetwallfx.controls.WordleSkin;
 import org.tweetwallfx.controls.steps.ImageMosaicStep;
 import org.tweetwallfx.stepengine.api.DataProvider;
@@ -57,6 +57,7 @@ import org.tweetwallfx.stepengine.api.config.StepEngineSettings;
 import org.tweetwallfx.stepengine.dataproviders.ImageStorage;
 import org.tweetwallfx.transitions.LocationTransition;
 import org.tweetwallfx.transitions.SizeTransition;
+import org.tweetwallfx.util.JsonDataConverter;
 
 public class DevoxxPhotoSharingMosaicStep implements Step {
 
@@ -67,7 +68,7 @@ public class DevoxxPhotoSharingMosaicStep implements Step {
     private final Set<Integer> highlightedIndexes = new HashSet<>();
     private Pane pane;
     private int count = 0;
-    private Image qrCode = new Image(this.getClass().getResourceAsStream("/photos-devoxx-be-qr.jpeg"));
+    private final Image qrCode = new Image(this.getClass().getResourceAsStream("/photos-devoxx-be-qr.jpeg"));
 
     private DevoxxPhotoSharingMosaicStep(Config config) {
         this.config = config;
@@ -81,7 +82,7 @@ public class DevoxxPhotoSharingMosaicStep implements Step {
                 ? false
                 : config.skipWhenSkipped.equals(context.get(Step.SKIP_TOKEN));
         boolean notEnoughImagesAvailable = context.getDataProvider(DevoxxPhotoSharingDataProvider.class)
-                .getAccess().count() < config.minimumNumberOfImagesInCache;
+                .getAccess().count() < config.getMinimumNumberOfImagesInCacheCalculated();
 
         boolean skip = forceSkipping || notEnoughImagesAvailable;
         return skip;
@@ -92,7 +93,7 @@ public class DevoxxPhotoSharingMosaicStep implements Step {
         WordleSkin wordleSkin = (WordleSkin) context.get("WordleSkin");
         DevoxxPhotoSharingDataProvider dataProvider = context.getDataProvider(DevoxxPhotoSharingDataProvider.class);
         pane = wordleSkin.getPane();
-        Transition createMosaicTransition = createMosaicTransition(dataProvider.getAccess().getImages(config.numberOfImagesToChooseFrom));
+        Transition createMosaicTransition = createMosaicTransition(dataProvider.getAccess().getImages(config.getNumberOfImagesToChooseFromCalculated()));
         createMosaicTransition.setOnFinished(event
                 -> executeAnimations(context));
 
@@ -147,16 +148,14 @@ public class DevoxxPhotoSharingMosaicStep implements Step {
         final List<FadeTransition> allFadeIns = new ArrayList<>();
         final double width = (0 != config.width ? config.width : pane.getWidth()) / (double) config.columns - 10;
         final double height = (0 != config.height ? config.height : pane.getHeight()) / (double) config.rows - 8;
-        int posOfQrCodeX = RANDOM.nextInt(config.columns);
-        int posOfQrCodeY = RANDOM.nextInt(config.rows);
-        final List<Image> distillingList = imageStorages.stream()
-                .map(ImageStorage::getImage)
-                .collect(Collectors.toList()); // mutable list required
+        final int posOfQrCodeX = RANDOM.nextInt(config.columns);
+        final int posOfQrCodeY = RANDOM.nextInt(config.rows);
+        final List<ImageStorage> distillingList = imageStorages; // mutable list required
 
         for (int i = 0; i < config.columns; i++) {
             for (int j = 0; j < config.rows; j++) {
                 int index = RANDOM.nextInt(distillingList.size());
-                Image selectedImage = (i == posOfQrCodeX && j == posOfQrCodeY) ? qrCode : distillingList.remove(index);
+                Image selectedImage = (i == posOfQrCodeX && j == posOfQrCodeY) ? qrCode : distillingList.remove(index).getImage();
                 ImageView imageView = new ImageView(selectedImage);
                 imageView.setCache(true);
                 imageView.setCacheHint(CacheHint.SPEED);
@@ -315,7 +314,9 @@ public class DevoxxPhotoSharingMosaicStep implements Step {
 
         @Override
         public DevoxxPhotoSharingMosaicStep create(final StepEngineSettings.StepDefinition stepDefinition) {
-            return new DevoxxPhotoSharingMosaicStep(stepDefinition.getConfig(Config.class));
+            final Config c = stepDefinition.getConfig(Config.class);
+            LoggerFactory.getLogger(Factory.class).info("stepConfig: {}", c);
+            return new DevoxxPhotoSharingMosaicStep(c);
         }
 
         @Override
@@ -331,17 +332,32 @@ public class DevoxxPhotoSharingMosaicStep implements Step {
 
     public static class Config extends AbstractConfig {
 
-        public double layoutX = 0;
-        public double layoutY = 0;
-        public double width = 0;
-        public double height = 0;
+        public double layoutX = 0D;
+        public double layoutY = 0D;
+        public double width = 0D;
+        public double height = 0D;
         public int columns = 6;
         public int rows = 5;
         public String skipWhenSkipped;
-        int minimumNumberOfImagesInCache = 35;
-        int numberOfImagesToChooseFrom = 50;
-        double percentageForHighlightImage = 0.8;
-        double resizeAndHighlightTransitionTime = 2.5;
-        int numberOfHighlights = 3;
+        public int minimumNumberOfImagesInCache = -1;
+
+        private int getMinimumNumberOfImagesInCacheCalculated() {
+            return minimumNumberOfImagesInCache > 0
+                    ? minimumNumberOfImagesInCache
+                    : columns * rows + Math.max(columns, rows);
+        }
+
+        public int numberOfImagesToChooseFrom = -1;
+        public double numberOfImagesToChooseFromExtension = 1.4D;
+
+        private int getNumberOfImagesToChooseFromCalculated() {
+            return numberOfImagesToChooseFrom > 0
+                    ? numberOfImagesToChooseFrom
+                    : (int) (numberOfImagesToChooseFromExtension * columns * rows);
+        }
+
+        public double percentageForHighlightImage = 0.8D;
+        public double resizeAndHighlightTransitionTime = 2.5D;
+        public int numberOfHighlights = 3;
     }
 }
